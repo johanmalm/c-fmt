@@ -1,3 +1,5 @@
 c-fmt
 tree-sitter-c/
 *.o
+_codeql_detected_source_root
+.cache/

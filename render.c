@@ -1,5 +1,4 @@
 #include "formatter.h"
-#include "util.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -57,6 +56,15 @@ emit_preserve_gap(const TokenStream *ts, uint32_t start, uint32_t end, FILE *out
 		}
 	}
 }
+
+static void
+print_indent(FILE *out, int indent)
+{
+	for (int i = 0; i < indent; i++) {
+		fputc('\t', out);
+	}
+}
+
 
 static void
 emit_gap(const TokenStream *ts, uint32_t start, uint32_t end, WsDecision ws,

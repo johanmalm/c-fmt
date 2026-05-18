@@ -1,5 +1,5 @@
 all:
-	$(CC) main.c formatter.c tokenize.c context.c rules.c render.c util.c tree-sitter-c/src/parser.c -o c-fmt -ltree-sitter
+	$(CC) main.c formatter.c tokenize.c context.c rules.c render.c tree-sitter-c/src/parser.c -o c-fmt -ltree-sitter
 
 test:
 	@./c-fmt main.c | diff -u main.c -
