@@ -136,9 +136,12 @@ rules_gap_decision(const TokenStream *ts, size_t index,
 		}
 	}
 
-	/* Pointer declarator spacing: newline before function name at file scope,
-	 * otherwise no space between '*' and identifier. */
+	/* Pointer declarator spacing: type and '*' are separated by a space
+	 * ('char *'), while '*' and the identifier have no space ('char *x').
+	 * At file scope inside a function definition, emit a newline between
+	 * '*' and the function name so the name starts on its own line. */
 	if (left && token_is(left, "*") && right->kind == TOK_IDENTIFIER) {
+		/* indent_depth == 0 means file scope. */
 		if (ctx && ctx->in_function_definition && !ctx->in_parameter_list
 				&& ctx->indent_depth == 0) {
 			return (WsDecision){ .kind = WS_NEWLINE };
