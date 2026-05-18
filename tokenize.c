@@ -12,42 +12,24 @@ is_syntax_leaf(TSNode node)
 static bool
 type_is_keyword(const char *type)
 {
-	return !strcmp(type, "if")
-		|| !strcmp(type, "else")
-		|| !strcmp(type, "while")
-		|| !strcmp(type, "for")
-		|| !strcmp(type, "switch")
-		|| !strcmp(type, "case")
-		|| !strcmp(type, "default")
-		|| !strcmp(type, "do")
-		|| !strcmp(type, "return")
-		|| !strcmp(type, "break")
-		|| !strcmp(type, "continue")
-		|| !strcmp(type, "goto")
-		|| !strcmp(type, "sizeof")
-		|| !strcmp(type, "static")
-		|| !strcmp(type, "extern")
-		|| !strcmp(type, "typedef")
-		|| !strcmp(type, "const")
-		|| !strcmp(type, "volatile")
-		|| !strcmp(type, "register")
-		|| !strcmp(type, "inline")
-		|| !strcmp(type, "restrict")
-		|| !strcmp(type, "struct")
-		|| !strcmp(type, "union")
-		|| !strcmp(type, "enum")
-		|| !strcmp(type, "auto")
-		|| !strcmp(type, "signed")
-		|| !strcmp(type, "unsigned")
-		|| !strcmp(type, "void")
-		|| !strcmp(type, "short")
-		|| !strcmp(type, "long")
-		|| !strcmp(type, "int")
-		|| !strcmp(type, "char")
-		|| !strcmp(type, "float")
-		|| !strcmp(type, "double")
-		|| !strcmp(type, "_Bool")
-		|| !strcmp(type, "_Complex")
+	return !strcmp(type, "if") || !strcmp(type, "else")
+		|| !strcmp(type, "while") || !strcmp(type, "for")
+		|| !strcmp(type, "switch") || !strcmp(type, "case")
+		|| !strcmp(type, "default") || !strcmp(type, "do")
+		|| !strcmp(type, "return") || !strcmp(type, "break")
+		|| !strcmp(type, "continue") || !strcmp(type, "goto")
+		|| !strcmp(type, "sizeof") || !strcmp(type, "static")
+		|| !strcmp(type, "extern") || !strcmp(type, "typedef")
+		|| !strcmp(type, "const") || !strcmp(type, "volatile")
+		|| !strcmp(type, "register") || !strcmp(type, "inline")
+		|| !strcmp(type, "restrict") || !strcmp(type, "struct")
+		|| !strcmp(type, "union") || !strcmp(type, "enum")
+		|| !strcmp(type, "auto") || !strcmp(type, "signed")
+		|| !strcmp(type, "unsigned") || !strcmp(type, "void")
+		|| !strcmp(type, "short") || !strcmp(type, "long")
+		|| !strcmp(type, "int") || !strcmp(type, "char")
+		|| !strcmp(type, "float") || !strcmp(type, "double")
+		|| !strcmp(type, "_Bool") || !strcmp(type, "_Complex")
 		|| !strcmp(type, "_Imaginary");
 }
 
@@ -63,7 +45,7 @@ classify_token(const char *type)
 	if (!strcmp(type, "primitive_type")) {
 		return TOK_KEYWORD;
 	}
-	if (!strcmp(type, "identifier")|| !strcmp(type, "type_identifier")
+	if (!strcmp(type, "identifier") || !strcmp(type, "type_identifier")
 			|| !strcmp(type, "field_identifier")) {
 		return TOK_IDENTIFIER;
 	}
@@ -129,9 +111,6 @@ collect_tokens(TokenStream *ts, TSNode node)
 	for (uint32_t i = 0; i < count; i++) {
 		TSNode child = ts_node_child(node, i);
 		if (ts_node_is_null(child)) {
-			continue;
-		}
-		if (!strcmp(ts_node_type(child), "ERROR")) {
 			continue;
 		}
 		if (collect_tokens(ts, child) != 0) {

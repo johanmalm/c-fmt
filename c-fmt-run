@@ -1,0 +1,5 @@
+#!/bin/sh
+
+[ $# -lt 1 ] && { printf 'usage: c-fmt-run <file>\n'; exit 1; }
+
+c-fmt $1 | diff -u $1 -

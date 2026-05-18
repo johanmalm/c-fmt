@@ -1,0 +1,5 @@
+#!/bin/sh
+
+command -v c-fmt-run || { printf 'fatal: need c-fmt-run\n' ; exit 1; }
+[ -e labwc/ ] || git clone https://github.com/labwc/labwc.git
+find labwc/src/ -name "*.c" -exec c-fmt-run {} \;

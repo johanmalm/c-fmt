@@ -13,8 +13,7 @@ is_preproc_ancestor(const char *type)
 static bool
 is_condition_parent(const char *type)
 {
-	return !strcmp(type, "if_statement")
-		|| !strcmp(type, "while_statement")
+	return !strcmp(type, "if_statement") || !strcmp(type, "while_statement")
 		|| !strcmp(type, "for_statement")
 		|| !strcmp(type, "switch_statement")
 		|| !strcmp(type, "do_statement");
@@ -32,12 +31,24 @@ context_at(TSNode node)
 		.in_compound_statement = false,
 		.in_function_definition = false,
 		.in_string_literal = false,
+		.in_for_header = false,
+		.in_field_declaration_list = false,
+		.in_switch_body = false,
 		.parent_type = "",
 	};
 
 	TSNode parent = ts_node_parent(node);
 	if (!ts_node_is_null(parent)) {
 		ctx.parent_type = ts_node_type(parent);
+
+		/* Token is a direct child of a switch compound_statement. */
+		if (!strcmp(ctx.parent_type, "compound_statement")) {
+			TSNode grandparent = ts_node_parent(parent);
+			if (!ts_node_is_null(grandparent)
+					&& !strcmp(ts_node_type(grandparent), "switch_statement")) {
+				ctx.in_switch_body = true;
+			}
+		}
 	}
 
 	for (TSNode anc = node; !ts_node_is_null(anc); anc = ts_node_parent(anc)) {
@@ -50,6 +61,8 @@ context_at(TSNode node)
 		if (!strcmp(type, "compound_statement")) {
 			ctx.indent_depth++;
 			ctx.in_compound_statement = true;
+		} else if (!strcmp(type, "field_declaration_list")) {
+			ctx.in_field_declaration_list = true;
 		} else if (!strcmp(type, "argument_list")) {
 			ctx.in_argument_list = true;
 		} else if (!strcmp(type, "parameter_list")) {
@@ -65,6 +78,11 @@ context_at(TSNode node)
 			if (!ts_node_is_null(cond_parent)
 				&& is_condition_parent(ts_node_type(cond_parent))) {
 				ctx.in_condition = true;
+			}
+		} else if (!strcmp(type, "for_statement")) {
+			/* Mark tokens in for-loop init/condition/update (not body). */
+			if (!ctx.in_compound_statement) {
+				ctx.in_for_header = true;
 			}
 		}
 	}
