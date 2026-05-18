@@ -85,6 +85,9 @@ emit_gap(const TokenStream *ts, uint32_t start, uint32_t end, WsDecision ws,
 		break;
 	case WS_BLANK_LINE:
 		fputs("\n\n", out);
+		if (ws.indent > 0) {
+			print_indent(out, ws.indent);
+		}
 		break;
 	case WS_NEWLINE_INDENT:
 		fputc('\n', out);

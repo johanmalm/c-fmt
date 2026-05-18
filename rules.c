@@ -136,12 +136,14 @@ rules_gap_decision(const TokenStream *ts, size_t index,
 		}
 	}
 
-	/* Pointer declarator spacing: 'char *name', but not '**argv'. */
+	/* Pointer declarator spacing: newline before function name at file scope,
+	 * otherwise no space between '*' and identifier. */
 	if (left && token_is(left, "*") && right->kind == TOK_IDENTIFIER) {
-		if (index >= 2 && token_is(&ts->tokens[index - 2], "*")) {
-			return (WsDecision){ .kind = WS_NONE };
+		if (ctx && ctx->in_function_definition && !ctx->in_parameter_list
+				&& ctx->indent_depth == 0) {
+			return (WsDecision){ .kind = WS_NEWLINE };
 		}
-		return (WsDecision){ .kind = WS_SPACE };
+		return (WsDecision){ .kind = WS_NONE };
 	}
 
 	/* No space after opening delimiters or unary operators. */
@@ -188,6 +190,9 @@ rules_gap_decision(const TokenStream *ts, size_t index,
 
 	/* Statement boundaries. */
 	if (left && token_is(left, ";") && ctx->in_compound_statement) {
+		if (gap_has_blank_line(ts, gap_start, gap_end)) {
+			return (WsDecision){ .kind = WS_BLANK_LINE, .indent = ctx->indent_depth };
+		}
 		return newline_indent(ctx->indent_depth);
 	}
 
@@ -202,7 +207,7 @@ rules_gap_decision(const TokenStream *ts, size_t index,
 		if ((token_is(right, "*") || token_is(right, "&"))
 				&& left
 				&& (left->kind == TOK_KEYWORD || left->kind == TOK_IDENTIFIER)) {
-			return (WsDecision){ .kind = WS_NONE };
+			return (WsDecision){ .kind = WS_SPACE };
 		}
 		return (WsDecision){ .kind = WS_SPACE };
 	}
