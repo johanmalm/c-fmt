@@ -32,6 +32,7 @@ context_at(TSNode node)
 		.in_compound_statement = false,
 		.in_function_definition = false,
 		.in_string_literal = false,
+		.in_for_header = false,
 		.parent_type = "",
 	};
 
@@ -65,6 +66,11 @@ context_at(TSNode node)
 			if (!ts_node_is_null(cond_parent)
 				&& is_condition_parent(ts_node_type(cond_parent))) {
 				ctx.in_condition = true;
+			}
+		} else if (!strcmp(type, "for_statement")) {
+			/* Mark tokens in for-loop init/condition/update (not body). */
+			if (!ctx.in_compound_statement) {
+				ctx.in_for_header = true;
 			}
 		}
 	}
