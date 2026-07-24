@@ -253,9 +253,14 @@ rules_gap_decision(const TokenStream *ts, size_t index,
 	}
 
 	/* 'else' / 'while' (do-while) after closing brace. */
-	if (left && token_is(left, "}") && right->kind == TOK_KEYWORD
-			&& (token_is(right, "else") || token_is(right, "while"))) {
-		return (WsDecision){ .kind = WS_SPACE };
+	if (left && token_is(left, "}") && right->kind == TOK_KEYWORD) {
+		if (token_is(right, "else")) {
+			return (WsDecision){ .kind = WS_SPACE };
+		}
+		if (token_is(right, "while")
+				&& !strcmp(ctx->parent_type, "do_statement")) {
+			return (WsDecision){ .kind = WS_SPACE };
+		}
 	}
 
 	/* Function body opening brace on its own line; if/else/for keep ') {'.
