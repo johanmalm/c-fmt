@@ -49,6 +49,30 @@ is_unary_context(const TokenStream *ts, size_t left_index, const Token *left)
 	if (!is_operator_token(left)) {
 		return false;
 	}
+	/* Assignment operators are always binary; never treat them as unary. */
+	if (token_is(left, "=") || token_is(left, "+=") || token_is(left, "-=")
+			|| token_is(left, "*=") || token_is(left, "/=")
+			|| token_is(left, "%=") || token_is(left, "&=")
+			|| token_is(left, "|=") || token_is(left, "^=")
+			|| token_is(left, "<<=") || token_is(left, ">>=")) {
+		return false;
+	}
+	/*
+	 * Use the AST parent type to reliably identify unary/pointer operators.
+	 * This handles cases like dereference (*ptr), address-of (&x), logical
+	 * not (!x), and pointer declarators (**pp) where token-level heuristics
+	 * would incorrectly classify them as binary operators.
+	 */
+	if (ts->contexts && left_index < ts->count) {
+		const char *pt = ts->contexts[left_index].parent_type;
+		if (!strcmp(pt, "pointer_declarator")
+				|| !strcmp(pt, "abstract_pointer_declarator")
+				|| !strcmp(pt, "pointer_expression")
+				|| !strcmp(pt, "unary_expression")
+				|| !strcmp(pt, "update_expression")) {
+			return true;
+		}
+	}
 	if (left_index == 0) {
 		return true;
 	}
@@ -119,11 +143,6 @@ rules_gap_decision(const TokenStream *ts, size_t index,
 		return (WsDecision){ .kind = WS_PRESERVE };
 	}
 
-	/* Preserve intentional blank lines at file scope. */
-	if (ctx->indent_depth == 0 && gap_has_blank_line(ts, gap_start, gap_end)) {
-		return (WsDecision){ .kind = WS_BLANK_LINE };
-	}
-
 	/* Space after comma; preserve newlines for multi-line argument/initializer lists. */
 	if (left && token_is(left, ",")) {
 		if (gap_has_newline(ts, gap_start, gap_end)) {
@@ -132,41 +151,85 @@ rules_gap_decision(const TokenStream *ts, size_t index,
 		return (WsDecision){ .kind = WS_SPACE };
 	}
 
+	/* Preserve intentional blank lines at file scope.
+	 * Inside struct/union bodies, use WS_PRESERVE so member indentation
+	 * is not lost. */
+	if (ctx->indent_depth == 0 && gap_has_blank_line(ts, gap_start, gap_end)) {
+		if (ctx->in_field_declaration_list) {
+			return (WsDecision){ .kind = WS_PRESERVE };
+		}
+		return (WsDecision){ .kind = WS_BLANK_LINE };
+	}
+
 	/* Tight punctuation: no space before closing/separators. */
 	if (right->kind == TOK_PUNCT) {
 		char c = lex_first(ts, right);
-		if (c == ';' || c == ')' || c == ']') {
+		if (c == ';' || c == ')' || c == ']' || c == ',') {
+			/* Preserve intentional line breaks before closing delimiters. */
+			if ((c == ')' || c == ']') && gap_has_newline(ts, gap_start, gap_end)) {
+				return (WsDecision){ .kind = WS_PRESERVE };
+			}
 			return (WsDecision){ .kind = WS_NONE };
 		}
 		if (c == ':') {
-			/* Space before ':' in ternary expressions. */
+			/* Space before ':' in ternary expressions; preserve newlines. */
 			if (!strcmp(ctx->parent_type, "conditional_expression")) {
+				if (gap_has_newline(ts, gap_start, gap_end)) {
+					return (WsDecision){ .kind = WS_PRESERVE };
+				}
 				return (WsDecision){ .kind = WS_SPACE };
 			}
 			return (WsDecision){ .kind = WS_NONE };
 		}
 	}
 
+	/* Space between pointer '*' and a type qualifier (e.g. 'char * const p').
+	 * This must come before the unary-context check which would otherwise
+	 * suppress the space when '*' follows a keyword. */
+	if (left && token_is(left, "*") && right->kind == TOK_KEYWORD
+			&& (token_is(right, "const") || token_is(right, "volatile")
+				|| token_is(right, "restrict"))) {
+		return (WsDecision){ .kind = WS_SPACE };
+	}
+
 	/* Pointer declarator spacing: type and '*' are separated by a space
 	 * ('char *'), while '*' and the identifier have no space ('char *x').
 	 * At file scope inside a function definition, emit a newline between
-	 * '*' and the function name so the name starts on its own line. */
+	 * '*' and the function name so the name starts on its own line.
+	 * Skip this rule when '*' is a binary operator (e.g. 'a * b'). */
 	if (left && token_is(left, "*") && right->kind == TOK_IDENTIFIER) {
-		/* indent_depth == 0 means file scope. */
-		if (ctx && ctx->in_function_definition && !ctx->in_parameter_list
-				&& ctx->indent_depth == 0) {
-			return (WsDecision){ .kind = WS_NEWLINE };
+		const FormatCtx *left_ctx = &ts->contexts[index - 1];
+		if (strcmp(left_ctx->parent_type, "binary_expression") != 0
+				&& strcmp(left_ctx->parent_type, "pointer_expression") != 0) {
+			/* indent_depth == 0 means file scope.
+			 * Preserve an intentional newline between '*' and the function
+			 * name; do not force one when they are on the same line. */
+			if (ctx && ctx->in_function_definition && !ctx->in_parameter_list
+					&& ctx->indent_depth == 0) {
+				if (gap_has_newline(ts, gap_start, gap_end)) {
+					return (WsDecision){ .kind = WS_NEWLINE };
+				}
+			}
+			return (WsDecision){ .kind = WS_NONE };
 		}
-		return (WsDecision){ .kind = WS_NONE };
 	}
 
 	/* No space after opening delimiters or unary operators. */
 	if (left) {
 		char lc = lex_first(ts, left);
 		if (lc == '(' || lc == '[') {
+			/* Preserve intentional line breaks after opening delimiters. */
+			if (gap_has_newline(ts, gap_start, gap_end)) {
+				return (WsDecision){ .kind = WS_PRESERVE };
+			}
 			return (WsDecision){ .kind = WS_NONE };
 		}
 		if (is_unary_context(ts, index - 1, left)) {
+			/* Exception: '*' followed by a number is a binary multiply
+			 * mis-classified as a dereference (e.g. 'sizeof(float) * 4'). */
+			if (token_is(left, "*") && right && right->kind == TOK_NUMBER) {
+				return (WsDecision){ .kind = WS_PRESERVE };
+			}
 			return (WsDecision){ .kind = WS_NONE };
 		}
 	}
@@ -184,13 +247,22 @@ rules_gap_decision(const TokenStream *ts, size_t index,
 	}
 
 	/* Function body opening brace on its own line; if/else/for keep ') {'.
-	 * Compound literals '(Type){ ... }' have no space before '{'. */
+	 * Compound literals '(Type){ ... }' have no space before '{'.
+	 * Macro calls used as loop constructs (e.g. wl_list_for_each) keep
+	 * the original spacing when used inside function bodies. */
 	if (left && token_is(left, ")") && token_is(right, "{")) {
 		if (!strcmp(ctx->parent_type, "initializer_list")) {
-			return (WsDecision){ .kind = WS_NONE };
+			/* Compound literal: preserve the author's spacing choice. */
+			return (WsDecision){ .kind = WS_PRESERVE };
 		}
 		const FormatCtx *left_ctx = &ts->contexts[index - 1];
 		if (left_ctx->in_condition || left_ctx->in_for_header) {
+			return (WsDecision){ .kind = WS_SPACE };
+		}
+		/* Inside a function body, preserve the original spacing so that
+		 * macro calls like wl_list_for_each(...) { keep their '{' inline. */
+		if (left_ctx->indent_depth > 0
+				&& !gap_has_newline(ts, gap_start, gap_end)) {
 			return (WsDecision){ .kind = WS_SPACE };
 		}
 		return (WsDecision){ .kind = WS_NEWLINE };
@@ -208,6 +280,11 @@ rules_gap_decision(const TokenStream *ts, size_t index,
 			if (right && (token_is(right, "case") || token_is(right, "default"))) {
 				return with_indent(ctx, -1);
 			}
+			/* Comments and other tokens at the start of a switch body should
+			 * be at the same indent level as case labels. */
+			if (ctx->in_switch_body) {
+				return with_indent(ctx, -1);
+			}
 			return newline_indent(ctx->indent_depth);
 		}
 	}
@@ -216,9 +293,39 @@ rules_gap_decision(const TokenStream *ts, size_t index,
 	if (left && token_is(left, ";") && ctx->in_compound_statement) {
 		const FormatCtx *left_ctx = &ts->contexts[index - 1];
 		if (left_ctx->in_for_header) {
+			if (gap_has_newline(ts, gap_start, gap_end)) {
+				return (WsDecision){ .kind = WS_PRESERVE };
+			}
 			return (WsDecision){ .kind = WS_SPACE };
 		}
+		/* Preserve trailing comments on the same line as a statement. */
+		if (!gap_has_newline(ts, gap_start, gap_end)) {
+			return (WsDecision){ .kind = WS_PRESERVE };
+		}
 		if (right && (token_is(right, "case") || token_is(right, "default"))) {
+			if (gap_has_blank_line(ts, gap_start, gap_end)) {
+				return (WsDecision){
+					.kind = WS_BLANK_LINE,
+					.indent = ctx->indent_depth - 1,
+				};
+			}
+			return with_indent(ctx, -1);
+		}
+		/* Goto labels are at column 0, preserving blank lines before them. */
+		if (!strcmp(ctx->parent_type, "labeled_statement")) {
+			if (gap_has_blank_line(ts, gap_start, gap_end)) {
+				return (WsDecision){ .kind = WS_BLANK_LINE, .indent = 0 };
+			}
+			return newline_indent(0);
+		}
+		/* Comments and tokens between switch cases stay at case-label indent. */
+		if (ctx->in_switch_body) {
+			if (gap_has_blank_line(ts, gap_start, gap_end)) {
+				return (WsDecision){
+					.kind = WS_BLANK_LINE,
+					.indent = ctx->indent_depth - 1,
+				};
+			}
 			return with_indent(ctx, -1);
 		}
 		if (gap_has_blank_line(ts, gap_start, gap_end)) {
@@ -249,7 +356,24 @@ rules_gap_decision(const TokenStream *ts, size_t index,
 		if ((token_is(right, "*") || token_is(right, "&"))
 				&& left
 				&& (left->kind == TOK_KEYWORD || left->kind == TOK_IDENTIFIER)) {
+			if (gap_has_newline(ts, gap_start, gap_end)) {
+				return (WsDecision){ .kind = WS_PRESERVE };
+			}
 			return (WsDecision){ .kind = WS_SPACE };
+		}
+		/* Unary operator immediately after a closing paren takes no space.
+		 * E.g. '(int *)&val', '(void *)!cond'.
+		 * Exception: if the operand is a number literal, the parser has
+		 * misclassified a binary multiply (e.g. 'sizeof(float) * 4')
+		 * as a pointer dereference; preserve the original spacing. */
+		if (left && lex_first(ts, left) == ')'
+				&& (!strcmp(ctx->parent_type, "pointer_expression")
+					|| !strcmp(ctx->parent_type, "unary_expression"))) {
+			const Token *operand = (index + 1 < ts->count) ? &ts->tokens[index + 1] : NULL;
+			if (operand && operand->kind == TOK_NUMBER) {
+				return (WsDecision){ .kind = WS_PRESERVE };
+			}
+			return (WsDecision){ .kind = WS_NONE };
 		}
 		if (gap_has_newline(ts, gap_start, gap_end)) {
 			return (WsDecision){ .kind = WS_PRESERVE };
@@ -257,10 +381,13 @@ rules_gap_decision(const TokenStream *ts, size_t index,
 		return (WsDecision){ .kind = WS_SPACE };
 	}
 
-	/* Top-level and declaration boundaries. */
-	if (ctx->indent_depth == 0 && left) {
+	/* Top-level and declaration boundaries.
+	 * Skip inside struct/union bodies (field_declaration_list) so that
+	 * member indentation is preserved. */
+	if (ctx->indent_depth == 0 && !ctx->in_field_declaration_list && left) {
 		if ((token_is(left, "}") || token_is(left, ";"))
-				&& right->kind != TOK_PUNCT) {
+				&& right->kind != TOK_PUNCT
+				&& gap_has_newline(ts, gap_start, gap_end)) {
 			return (WsDecision){ .kind = WS_NEWLINE };
 		}
 		if (left->kind == TOK_PREPROC || token_is(left, "#include")) {
@@ -273,7 +400,8 @@ rules_gap_decision(const TokenStream *ts, size_t index,
 
 	/* Blank line between top-level declarations. */
 	if (ctx->indent_depth == 0 && left && token_is(left, "}")
-			&& (right->kind == TOK_KEYWORD || right->kind == TOK_IDENTIFIER)) {
+			&& (right->kind == TOK_KEYWORD || right->kind == TOK_IDENTIFIER)
+			&& gap_has_newline(ts, gap_start, gap_end)) {
 		return (WsDecision){ .kind = WS_BLANK_LINE };
 	}
 

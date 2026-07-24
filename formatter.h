@@ -35,6 +35,8 @@ typedef struct FormatCtx {
 	bool in_function_definition;
 	bool in_string_literal;
 	bool in_for_header;
+	bool in_field_declaration_list;
+	bool in_switch_body;
 	const char *parent_type;
 } FormatCtx;
 

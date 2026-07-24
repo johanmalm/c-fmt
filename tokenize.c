@@ -113,9 +113,6 @@ collect_tokens(TokenStream *ts, TSNode node)
 		if (ts_node_is_null(child)) {
 			continue;
 		}
-		if (!strcmp(ts_node_type(child), "ERROR")) {
-			continue;
-		}
 		if (collect_tokens(ts, child) != 0) {
 			return -1;
 		}
