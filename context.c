@@ -13,8 +13,7 @@ is_preproc_ancestor(const char *type)
 static bool
 is_condition_parent(const char *type)
 {
-	return !strcmp(type, "if_statement")
-		|| !strcmp(type, "while_statement")
+	return !strcmp(type, "if_statement") || !strcmp(type, "while_statement")
 		|| !strcmp(type, "for_statement")
 		|| !strcmp(type, "switch_statement")
 		|| !strcmp(type, "do_statement");
