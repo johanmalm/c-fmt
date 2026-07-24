@@ -14,8 +14,11 @@ OBJ = \
 
 all: $(PROG)
 
-c-fmt: $(OBJ)
-	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+$(PROG): $(OBJ)
+	@echo '     LINK  '$@;$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+%.o : %.c
+	@echo '     CC    '$@;$(CC) $(CFLAGS) -c $<
 
 .ONESHELL:
 test:
