@@ -225,12 +225,24 @@ rules_gap_decision(const TokenStream *ts, size_t index,
 			return (WsDecision){ .kind = WS_NONE };
 		}
 		if (is_unary_context(ts, index - 1, left)) {
-			/* Exception: '*' followed by a number is a binary multiply
-			 * mis-classified as a dereference (e.g. 'sizeof(float) * 4'). */
-			if (token_is(left, "*") && right && right->kind == TOK_NUMBER) {
-				return (WsDecision){ .kind = WS_PRESERVE };
+			/* Postfix ++/-- is unary before the operator, but the operand
+			 * that follows is outside update_expression and needs normal
+			 * spacing (e.g. '*dst++ = x'). */
+			if ((token_is(left, "++") || token_is(left, "--"))
+					&& ts->contexts && index < ts->count
+					&& !strcmp(ts->contexts[index - 1].parent_type,
+						"update_expression")
+					&& strcmp(ts->contexts[index - 1].parent_type,
+						ts->contexts[index].parent_type)) {
+				/* fall through to binary operator spacing below */
+			} else {
+				/* Exception: '*' followed by a number is a binary multiply
+				 * mis-classified as a dereference (e.g. 'sizeof(float) * 4'). */
+				if (token_is(left, "*") && right && right->kind == TOK_NUMBER) {
+					return (WsDecision){ .kind = WS_PRESERVE };
+				}
+				return (WsDecision){ .kind = WS_NONE };
 			}
-			return (WsDecision){ .kind = WS_NONE };
 		}
 	}
 
