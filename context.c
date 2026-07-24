@@ -19,6 +19,17 @@ is_condition_parent(const char *type)
 		|| !strcmp(type, "do_statement");
 }
 
+static bool
+is_case_body_compound(TSNode node)
+{
+	if (strcmp(ts_node_type(node), "compound_statement") != 0) {
+		return false;
+	}
+	TSNode parent = ts_node_parent(node);
+	return !ts_node_is_null(parent)
+		&& !strcmp(ts_node_type(parent), "case_statement");
+}
+
 static FormatCtx
 context_at(TSNode node)
 {
@@ -59,6 +70,12 @@ context_at(TSNode node)
 		}
 
 		if (!strcmp(type, "compound_statement")) {
+			if (is_case_body_compound(anc)) {
+				/* case FOO: { ... } scopes variables but does not add
+				 * an extra indent level in the author's style. */
+				ctx.in_compound_statement = true;
+				continue;
+			}
 			ctx.indent_depth++;
 			ctx.in_compound_statement = true;
 		} else if (!strcmp(type, "field_declaration_list")) {
