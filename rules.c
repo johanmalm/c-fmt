@@ -69,6 +69,7 @@ is_unary_context(const TokenStream *ts, size_t left_index, const Token *left)
 static bool
 needs_space_after_keyword(const Token *tok)
 {
+	/* sizeof uses no space before its argument: sizeof(Type) not sizeof (Type). */
 	return token_is(tok, "if") || token_is(tok, "while") || token_is(tok, "for")
 		|| token_is(tok, "switch") || token_is(tok, "return")
 		|| token_is(tok, "case");
