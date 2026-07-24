@@ -113,21 +113,10 @@ rules_gap_decision(const TokenStream *ts, size_t index,
 		return (WsDecision){ .kind = WS_PRESERVE };
 	}
 
-	/* Preprocessor lines. */
-	if (ctx->in_preproc || right->kind == TOK_PREPROC) {
-		if (left && (left->kind == TOK_PREPROC || token_is(left, "#include"))) {
-			return (WsDecision){ .kind = WS_SPACE };
-		}
-		if (left) {
-			if (gap_has_blank_line(ts, gap_start, gap_end)) {
-				return (WsDecision){ .kind = WS_BLANK_LINE };
-			}
-			return (WsDecision){ .kind = WS_NEWLINE };
-		}
-		if (gap_start == 0 && gap_end > 0 && ts->source[0] == '\n') {
-			return (WsDecision){ .kind = WS_NEWLINE };
-		}
-		return (WsDecision){ .kind = WS_NONE };
+	/* Preserve spacing around preprocessor tokens and within preproc blocks. */
+	if (ctx->in_preproc || right->kind == TOK_PREPROC
+			|| (left && left->kind == TOK_PREPROC)) {
+		return (WsDecision){ .kind = WS_PRESERVE };
 	}
 
 	/* Preserve intentional blank lines at file scope. */
@@ -270,7 +259,8 @@ rules_gap_decision(const TokenStream *ts, size_t index,
 
 	/* Top-level and declaration boundaries. */
 	if (ctx->indent_depth == 0 && left) {
-		if (token_is(left, "}") || token_is(left, ";")) {
+		if ((token_is(left, "}") || token_is(left, ";"))
+				&& right->kind != TOK_PUNCT) {
 			return (WsDecision){ .kind = WS_NEWLINE };
 		}
 		if (left->kind == TOK_PREPROC || token_is(left, "#include")) {
