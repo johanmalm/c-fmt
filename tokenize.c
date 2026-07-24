@@ -63,7 +63,7 @@ classify_token(const char *type)
 	if (!strcmp(type, "primitive_type")) {
 		return TOK_KEYWORD;
 	}
-	if (!strcmp(type, "identifier")|| !strcmp(type, "type_identifier")
+	if (!strcmp(type, "identifier") || !strcmp(type, "type_identifier")
 			|| !strcmp(type, "field_identifier")) {
 		return TOK_IDENTIFIER;
 	}

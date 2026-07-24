@@ -27,6 +27,17 @@ gap_has_blank_line(const TokenStream *ts, uint32_t start, uint32_t end)
 }
 
 static bool
+gap_has_newline(const TokenStream *ts, uint32_t start, uint32_t end)
+{
+	for (uint32_t i = start; i < end; i++) {
+		if (ts->source[i] == '\n') {
+			return true;
+		}
+	}
+	return false;
+}
+
+static bool
 is_operator_token(const Token *tok)
 {
 	return tok->kind == TOK_OPERATOR;
@@ -43,7 +54,7 @@ is_unary_context(const TokenStream *ts, size_t left_index, const Token *left)
 	}
 	const Token *prev = &ts->tokens[left_index - 1];
 	char c = lex_first(ts, prev);
-	if (c == '(' || c == ',' || c == '[' || c == '=' || c == '{' || c == ';' || c == ':') {
+	if (c == '(' || c == ',' || c == '[' || c == '=' || c == '{' || c == ';' || c == ':' || c == '?') {
 		return true;
 	}
 	if (prev->kind == TOK_KEYWORD) {
@@ -59,7 +70,7 @@ static bool
 needs_space_after_keyword(const Token *tok)
 {
 	return token_is(tok, "if") || token_is(tok, "while") || token_is(tok, "for")
-		|| token_is(tok, "switch") || token_is(tok, "return") || token_is(tok, "sizeof")
+		|| token_is(tok, "switch") || token_is(tok, "return")
 		|| token_is(tok, "case");
 }
 
@@ -123,15 +134,25 @@ rules_gap_decision(const TokenStream *ts, size_t index,
 		return (WsDecision){ .kind = WS_BLANK_LINE };
 	}
 
-	/* Space after comma. */
+	/* Space after comma; preserve newlines for multi-line argument/initializer lists. */
 	if (left && token_is(left, ",")) {
+		if (gap_has_newline(ts, gap_start, gap_end)) {
+			return (WsDecision){ .kind = WS_PRESERVE };
+		}
 		return (WsDecision){ .kind = WS_SPACE };
 	}
 
 	/* Tight punctuation: no space before closing/separators. */
 	if (right->kind == TOK_PUNCT) {
 		char c = lex_first(ts, right);
-		if (c == ';' || c == ')' || c == ']' || c == ':') {
+		if (c == ';' || c == ')' || c == ']') {
+			return (WsDecision){ .kind = WS_NONE };
+		}
+		if (c == ':') {
+			/* Space before ':' in ternary expressions. */
+			if (!strcmp(ctx->parent_type, "conditional_expression")) {
+				return (WsDecision){ .kind = WS_SPACE };
+			}
 			return (WsDecision){ .kind = WS_NONE };
 		}
 	}
@@ -172,35 +193,63 @@ rules_gap_decision(const TokenStream *ts, size_t index,
 		return (WsDecision){ .kind = WS_SPACE };
 	}
 
-	/* Function body opening brace on its own line; if/else keep ') {'. */
+	/* Function body opening brace on its own line; if/else/for keep ') {'.
+	 * Compound literals '(Type){ ... }' have no space before '{'. */
 	if (left && token_is(left, ")") && token_is(right, "{")) {
+		if (!strcmp(ctx->parent_type, "initializer_list")) {
+			return (WsDecision){ .kind = WS_NONE };
+		}
 		const FormatCtx *left_ctx = &ts->contexts[index - 1];
-		if (left_ctx->in_condition) {
+		if (left_ctx->in_condition || left_ctx->in_for_header) {
 			return (WsDecision){ .kind = WS_SPACE };
 		}
 		return (WsDecision){ .kind = WS_NEWLINE };
 	}
 
-	/* Closing brace alignment. */
-	if (token_is(right, "}")) {
+	/* Closing brace alignment — only for compound statements. */
+	if (token_is(right, "}") && !strcmp(ctx->parent_type, "compound_statement")) {
 		return with_indent(ctx, -1);
 	}
 
 	/* First token inside a compound statement. */
 	if (left && token_is(left, "{") && ctx->in_compound_statement) {
-		return newline_indent(ctx->indent_depth);
+		const FormatCtx *left_ctx = &ts->contexts[index - 1];
+		if (!strcmp(left_ctx->parent_type, "compound_statement")) {
+			if (right && (token_is(right, "case") || token_is(right, "default"))) {
+				return with_indent(ctx, -1);
+			}
+			return newline_indent(ctx->indent_depth);
+		}
 	}
 
 	/* Statement boundaries. */
 	if (left && token_is(left, ";") && ctx->in_compound_statement) {
+		const FormatCtx *left_ctx = &ts->contexts[index - 1];
+		if (left_ctx->in_for_header) {
+			return (WsDecision){ .kind = WS_SPACE };
+		}
+		if (right && (token_is(right, "case") || token_is(right, "default"))) {
+			return with_indent(ctx, -1);
+		}
 		if (gap_has_blank_line(ts, gap_start, gap_end)) {
 			return (WsDecision){ .kind = WS_BLANK_LINE, .indent = ctx->indent_depth };
 		}
 		return newline_indent(ctx->indent_depth);
 	}
 
-	/* Operators: space on both sides unless unary. */
+	/* Postfix ++/-- has no space before it. */
+	if (right && (token_is(right, "++") || token_is(right, "--")) && left
+			&& (left->kind == TOK_IDENTIFIER
+				|| (left->kind == TOK_PUNCT
+					&& (lex_first(ts, left) == ')' || lex_first(ts, left) == ']')))) {
+		return (WsDecision){ .kind = WS_NONE };
+	}
+
+	/* Operators: space on both sides unless unary; preserve multi-line chains. */
 	if (left && is_operator_token(left) && !is_unary_context(ts, index - 1, left)) {
+		if (gap_has_newline(ts, gap_start, gap_end)) {
+			return (WsDecision){ .kind = WS_PRESERVE };
+		}
 		return (WsDecision){ .kind = WS_SPACE };
 	}
 	if (is_operator_token(right)) {
@@ -211,6 +260,9 @@ rules_gap_decision(const TokenStream *ts, size_t index,
 				&& left
 				&& (left->kind == TOK_KEYWORD || left->kind == TOK_IDENTIFIER)) {
 			return (WsDecision){ .kind = WS_SPACE };
+		}
+		if (gap_has_newline(ts, gap_start, gap_end)) {
+			return (WsDecision){ .kind = WS_PRESERVE };
 		}
 		return (WsDecision){ .kind = WS_SPACE };
 	}

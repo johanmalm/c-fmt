@@ -65,7 +65,6 @@ print_indent(FILE *out, int indent)
 	}
 }
 
-
 static void
 emit_gap(const TokenStream *ts, uint32_t start, uint32_t end, WsDecision ws,
 		const FormatCtx *ctx, FILE *out)
