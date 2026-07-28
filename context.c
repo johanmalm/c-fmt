@@ -30,10 +30,10 @@ is_case_body_compound(TSNode node)
 		&& !strcmp(ts_node_type(parent), "case_statement");
 }
 
-static FormatCtx
+static struct format_ctx
 context_at(TSNode node)
 {
-	FormatCtx ctx = {
+	struct format_ctx ctx = {
 		.indent_depth = 0,
 		.in_argument_list = false,
 		.in_parameter_list = false,
@@ -108,9 +108,9 @@ context_at(TSNode node)
 }
 
 void
-context_build(TokenStream *ts)
+context_build(struct token_stream *ts)
 {
-	ts->contexts = calloc(ts->count, sizeof(FormatCtx));
+	ts->contexts = calloc(ts->count, sizeof(struct format_ctx));
 	if (!ts->contexts) {
 		return;
 	}

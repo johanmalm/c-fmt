@@ -3,19 +3,19 @@
 #include <string.h>
 
 static bool
-token_is(const Token *tok, const char *s)
+token_is(const struct token *tok, const char *s)
 {
 	return !strcmp(tok->type, s);
 }
 
 static char
-lex_first(const TokenStream *ts, const Token *tok)
+lex_first(const struct token_stream *ts, const struct token *tok)
 {
 	return ts->source[tok->start];
 }
 
 static bool
-gap_has_blank_line(const TokenStream *ts, uint32_t start, uint32_t end)
+gap_has_blank_line(const struct token_stream *ts, uint32_t start, uint32_t end)
 {
 	int newlines = 0;
 	for (uint32_t i = start; i < end; i++) {
@@ -27,7 +27,7 @@ gap_has_blank_line(const TokenStream *ts, uint32_t start, uint32_t end)
 }
 
 static bool
-gap_has_newline(const TokenStream *ts, uint32_t start, uint32_t end)
+gap_has_newline(const struct token_stream *ts, uint32_t start, uint32_t end)
 {
 	for (uint32_t i = start; i < end; i++) {
 		if (ts->source[i] == '\n') {
@@ -38,13 +38,13 @@ gap_has_newline(const TokenStream *ts, uint32_t start, uint32_t end)
 }
 
 static bool
-is_operator_token(const Token *tok)
+is_operator_token(const struct token *tok)
 {
 	return tok->kind == TOK_OPERATOR;
 }
 
 static bool
-is_unary_context(const TokenStream *ts, size_t left_index, const Token *left)
+is_unary_context(const struct token_stream *ts, size_t left_index, const struct token *left)
 {
 	if (!is_operator_token(left)) {
 		return false;
@@ -76,7 +76,7 @@ is_unary_context(const TokenStream *ts, size_t left_index, const Token *left)
 	if (left_index == 0) {
 		return true;
 	}
-	const Token *prev = &ts->tokens[left_index - 1];
+	const struct token *prev = &ts->tokens[left_index - 1];
 	char c = lex_first(ts, prev);
 	if (c == '(' || c == ',' || c == '[' || c == '=' || c == '{' || c == ';' || c == ':' || c == '?') {
 		return true;
@@ -91,7 +91,7 @@ is_unary_context(const TokenStream *ts, size_t left_index, const Token *left)
 }
 
 static bool
-needs_space_after_keyword(const Token *tok)
+needs_space_after_keyword(const struct token *tok)
 {
 	/*
 	 * sizeof uses no space before its argument: sizeof(Type) not
@@ -102,14 +102,14 @@ needs_space_after_keyword(const Token *tok)
 		|| token_is(tok, "case");
 }
 
-static WsDecision
+static struct whitespace_decision
 newline_indent(int depth)
 {
-	return (WsDecision){ .kind = WS_NEWLINE_INDENT, .indent = depth };
+	return (struct whitespace_decision){ .kind = WS_NEWLINE_INDENT, .indent = depth };
 }
 
-static WsDecision
-with_indent(const FormatCtx *ctx, int adjust)
+static struct whitespace_decision
+with_indent(const struct format_ctx *ctx, int adjust)
 {
 	int depth = ctx->indent_depth + adjust;
 	if (depth < 0) {
@@ -118,26 +118,26 @@ with_indent(const FormatCtx *ctx, int adjust)
 	return newline_indent(depth);
 }
 
-WsDecision
-rules_gap_decision(const TokenStream *ts, size_t index,
-		uint32_t gap_start, uint32_t gap_end, const FormatCtx *ctx)
+struct whitespace_decision
+rules_gap_decision(const struct token_stream *ts, size_t index,
+		uint32_t gap_start, uint32_t gap_end, const struct format_ctx *ctx)
 {
-	const Token *right = index < ts->count ? &ts->tokens[index] : NULL;
-	const Token *left = index > 0 ? &ts->tokens[index - 1] : NULL;
+	const struct token *right = index < ts->count ? &ts->tokens[index] : NULL;
+	const struct token *left = index > 0 ? &ts->tokens[index - 1] : NULL;
 
 	if (!right) {
 		if (gap_has_blank_line(ts, gap_start, gap_end)) {
-			return (WsDecision){ .kind = WS_BLANK_LINE };
+			return (struct whitespace_decision){ .kind = WS_BLANK_LINE };
 		}
-		return (WsDecision){ .kind = WS_NEWLINE };
+		return (struct whitespace_decision){ .kind = WS_NEWLINE };
 	}
 
 	if (!ctx) {
-		return (WsDecision){ .kind = WS_PRESERVE };
+		return (struct whitespace_decision){ .kind = WS_PRESERVE };
 	}
 
 	if (ctx->in_string_literal) {
-		return (WsDecision){ .kind = WS_PRESERVE };
+		return (struct whitespace_decision){ .kind = WS_PRESERVE };
 	}
 
 	/*
@@ -146,7 +146,7 @@ rules_gap_decision(const TokenStream *ts, size_t index,
 	 */
 	if (ctx->in_preproc || right->kind == TOK_PREPROC
 			|| (left && left->kind == TOK_PREPROC)) {
-		return (WsDecision){ .kind = WS_PRESERVE };
+		return (struct whitespace_decision){ .kind = WS_PRESERVE };
 	}
 
 	/*
@@ -155,9 +155,9 @@ rules_gap_decision(const TokenStream *ts, size_t index,
 	 */
 	if (left && token_is(left, ",")) {
 		if (gap_has_newline(ts, gap_start, gap_end)) {
-			return (WsDecision){ .kind = WS_PRESERVE };
+			return (struct whitespace_decision){ .kind = WS_PRESERVE };
 		}
-		return (WsDecision){ .kind = WS_SPACE };
+		return (struct whitespace_decision){ .kind = WS_SPACE };
 	}
 
 	/*
@@ -166,9 +166,9 @@ rules_gap_decision(const TokenStream *ts, size_t index,
 	 */
 	if (ctx->indent_depth == 0 && gap_has_blank_line(ts, gap_start, gap_end)) {
 		if (ctx->in_field_declaration_list) {
-			return (WsDecision){ .kind = WS_PRESERVE };
+			return (struct whitespace_decision){ .kind = WS_PRESERVE };
 		}
-		return (WsDecision){ .kind = WS_BLANK_LINE };
+		return (struct whitespace_decision){ .kind = WS_BLANK_LINE };
 	}
 
 	/* Tight punctuation: no space before closing/separators. */
@@ -180,9 +180,9 @@ rules_gap_decision(const TokenStream *ts, size_t index,
 			 * delimiters.
 			 */
 			if ((c == ')' || c == ']') && gap_has_newline(ts, gap_start, gap_end)) {
-				return (WsDecision){ .kind = WS_PRESERVE };
+				return (struct whitespace_decision){ .kind = WS_PRESERVE };
 			}
-			return (WsDecision){ .kind = WS_NONE };
+			return (struct whitespace_decision){ .kind = WS_NONE };
 		}
 		if (c == ':') {
 			/*
@@ -191,11 +191,11 @@ rules_gap_decision(const TokenStream *ts, size_t index,
 			 */
 			if (!strcmp(ctx->parent_type, "conditional_expression")) {
 				if (gap_has_newline(ts, gap_start, gap_end)) {
-					return (WsDecision){ .kind = WS_PRESERVE };
+					return (struct whitespace_decision){ .kind = WS_PRESERVE };
 				}
-				return (WsDecision){ .kind = WS_SPACE };
+				return (struct whitespace_decision){ .kind = WS_SPACE };
 			}
-			return (WsDecision){ .kind = WS_NONE };
+			return (struct whitespace_decision){ .kind = WS_NONE };
 		}
 	}
 
@@ -207,7 +207,7 @@ rules_gap_decision(const TokenStream *ts, size_t index,
 	if (left && token_is(left, "*") && right->kind == TOK_KEYWORD
 			&& (token_is(right, "const") || token_is(right, "volatile")
 				|| token_is(right, "restrict"))) {
-		return (WsDecision){ .kind = WS_SPACE };
+		return (struct whitespace_decision){ .kind = WS_SPACE };
 	}
 
 	/*
@@ -218,7 +218,7 @@ rules_gap_decision(const TokenStream *ts, size_t index,
 	 * this rule when '*' is a binary operator (e.g. 'a * b').
 	 */
 	if (left && token_is(left, "*") && right->kind == TOK_IDENTIFIER) {
-		const FormatCtx *left_ctx = &ts->contexts[index - 1];
+		const struct format_ctx *left_ctx = &ts->contexts[index - 1];
 		if (strcmp(left_ctx->parent_type, "binary_expression") != 0
 				&& strcmp(left_ctx->parent_type, "pointer_expression") != 0) {
 			/*
@@ -230,10 +230,10 @@ rules_gap_decision(const TokenStream *ts, size_t index,
 			if (ctx && ctx->in_function_definition && !ctx->in_parameter_list
 					&& ctx->indent_depth == 0) {
 				if (gap_has_newline(ts, gap_start, gap_end)) {
-					return (WsDecision){ .kind = WS_NEWLINE };
+					return (struct whitespace_decision){ .kind = WS_NEWLINE };
 				}
 			}
-			return (WsDecision){ .kind = WS_NONE };
+			return (struct whitespace_decision){ .kind = WS_NONE };
 		}
 	}
 
@@ -246,9 +246,9 @@ rules_gap_decision(const TokenStream *ts, size_t index,
 			 * delimiters.
 			 */
 			if (gap_has_newline(ts, gap_start, gap_end)) {
-				return (WsDecision){ .kind = WS_PRESERVE };
+				return (struct whitespace_decision){ .kind = WS_PRESERVE };
 			}
-			return (WsDecision){ .kind = WS_NONE };
+			return (struct whitespace_decision){ .kind = WS_NONE };
 		}
 		if (is_unary_context(ts, index - 1, left)) {
 			/*
@@ -272,9 +272,9 @@ rules_gap_decision(const TokenStream *ts, size_t index,
 				 * dereference (e.g. 'sizeof(float) * 4').
 				 */
 				if (token_is(left, "*") && right && right->kind == TOK_NUMBER) {
-					return (WsDecision){ .kind = WS_PRESERVE };
+					return (struct whitespace_decision){ .kind = WS_PRESERVE };
 				}
-				return (WsDecision){ .kind = WS_NONE };
+				return (struct whitespace_decision){ .kind = WS_NONE };
 			}
 		}
 	}
@@ -282,17 +282,17 @@ rules_gap_decision(const TokenStream *ts, size_t index,
 	/* Keyword before '('. */
 	if (left && left->kind == TOK_KEYWORD && needs_space_after_keyword(left)
 			&& lex_first(ts, right) == '(') {
-		return (WsDecision){ .kind = WS_SPACE };
+		return (struct whitespace_decision){ .kind = WS_SPACE };
 	}
 
 	/* 'else' / 'while' (do-while) after closing brace. */
 	if (left && token_is(left, "}") && right->kind == TOK_KEYWORD) {
 		if (token_is(right, "else")) {
-			return (WsDecision){ .kind = WS_SPACE };
+			return (struct whitespace_decision){ .kind = WS_SPACE };
 		}
 		if (token_is(right, "while")
 				&& !strcmp(ctx->parent_type, "do_statement")) {
-			return (WsDecision){ .kind = WS_SPACE };
+			return (struct whitespace_decision){ .kind = WS_SPACE };
 		}
 	}
 
@@ -308,11 +308,11 @@ rules_gap_decision(const TokenStream *ts, size_t index,
 			 * Compound literal: preserve the author's spacing
 			 * choice.
 			 */
-			return (WsDecision){ .kind = WS_PRESERVE };
+			return (struct whitespace_decision){ .kind = WS_PRESERVE };
 		}
-		const FormatCtx *left_ctx = &ts->contexts[index - 1];
+		const struct format_ctx *left_ctx = &ts->contexts[index - 1];
 		if (left_ctx->in_condition || left_ctx->in_for_header) {
-			return (WsDecision){ .kind = WS_SPACE };
+			return (struct whitespace_decision){ .kind = WS_SPACE };
 		}
 
 		/*
@@ -322,9 +322,9 @@ rules_gap_decision(const TokenStream *ts, size_t index,
 		 */
 		if (left_ctx->indent_depth > 0
 				&& !gap_has_newline(ts, gap_start, gap_end)) {
-			return (WsDecision){ .kind = WS_SPACE };
+			return (struct whitespace_decision){ .kind = WS_SPACE };
 		}
-		return (WsDecision){ .kind = WS_NEWLINE };
+		return (struct whitespace_decision){ .kind = WS_NEWLINE };
 	}
 
 	/* Closing brace alignment — only for compound statements. */
@@ -334,7 +334,7 @@ rules_gap_decision(const TokenStream *ts, size_t index,
 
 	/* First token inside a compound statement. */
 	if (left && token_is(left, "{") && ctx->in_compound_statement) {
-		const FormatCtx *left_ctx = &ts->contexts[index - 1];
+		const struct format_ctx *left_ctx = &ts->contexts[index - 1];
 		if (!strcmp(left_ctx->parent_type, "compound_statement")) {
 			if (right && (token_is(right, "case") || token_is(right, "default"))) {
 				return with_indent(ctx, -1);
@@ -353,20 +353,20 @@ rules_gap_decision(const TokenStream *ts, size_t index,
 
 	/* Statement boundaries. */
 	if (left && token_is(left, ";") && ctx->in_compound_statement) {
-		const FormatCtx *left_ctx = &ts->contexts[index - 1];
+		const struct format_ctx *left_ctx = &ts->contexts[index - 1];
 		if (left_ctx->in_for_header) {
 			if (gap_has_newline(ts, gap_start, gap_end)) {
-				return (WsDecision){ .kind = WS_PRESERVE };
+				return (struct whitespace_decision){ .kind = WS_PRESERVE };
 			}
-			return (WsDecision){ .kind = WS_SPACE };
+			return (struct whitespace_decision){ .kind = WS_SPACE };
 		}
 		/* Preserve trailing comments on same line as a statement */
 		if (!gap_has_newline(ts, gap_start, gap_end)) {
-			return (WsDecision){ .kind = WS_PRESERVE };
+			return (struct whitespace_decision){ .kind = WS_PRESERVE };
 		}
 		if (right && (token_is(right, "case") || token_is(right, "default"))) {
 			if (gap_has_blank_line(ts, gap_start, gap_end)) {
-				return (WsDecision){
+				return (struct whitespace_decision){
 					.kind = WS_BLANK_LINE,
 					.indent = ctx->indent_depth - 1,
 				};
@@ -380,7 +380,7 @@ rules_gap_decision(const TokenStream *ts, size_t index,
 		 */
 		if (!strcmp(ctx->parent_type, "labeled_statement")) {
 			if (gap_has_blank_line(ts, gap_start, gap_end)) {
-				return (WsDecision){ .kind = WS_BLANK_LINE, .indent = 0 };
+				return (struct whitespace_decision){ .kind = WS_BLANK_LINE, .indent = 0 };
 			}
 			return newline_indent(0);
 		}
@@ -391,7 +391,7 @@ rules_gap_decision(const TokenStream *ts, size_t index,
 		 */
 		if (ctx->in_switch_body) {
 			if (gap_has_blank_line(ts, gap_start, gap_end)) {
-				return (WsDecision){
+				return (struct whitespace_decision){
 					.kind = WS_BLANK_LINE,
 					.indent = ctx->indent_depth - 1,
 				};
@@ -399,7 +399,7 @@ rules_gap_decision(const TokenStream *ts, size_t index,
 			return with_indent(ctx, -1);
 		}
 		if (gap_has_blank_line(ts, gap_start, gap_end)) {
-			return (WsDecision){ .kind = WS_BLANK_LINE, .indent = ctx->indent_depth };
+			return (struct whitespace_decision){ .kind = WS_BLANK_LINE, .indent = ctx->indent_depth };
 		}
 		return newline_indent(ctx->indent_depth);
 	}
@@ -409,7 +409,7 @@ rules_gap_decision(const TokenStream *ts, size_t index,
 			&& (left->kind == TOK_IDENTIFIER
 				|| (left->kind == TOK_PUNCT
 					&& (lex_first(ts, left) == ')' || lex_first(ts, left) == ']')))) {
-		return (WsDecision){ .kind = WS_NONE };
+		return (struct whitespace_decision){ .kind = WS_NONE };
 	}
 
 	/*
@@ -418,21 +418,21 @@ rules_gap_decision(const TokenStream *ts, size_t index,
 	 */
 	if (left && is_operator_token(left) && !is_unary_context(ts, index - 1, left)) {
 		if (gap_has_newline(ts, gap_start, gap_end)) {
-			return (WsDecision){ .kind = WS_PRESERVE };
+			return (struct whitespace_decision){ .kind = WS_PRESERVE };
 		}
-		return (WsDecision){ .kind = WS_SPACE };
+		return (struct whitespace_decision){ .kind = WS_SPACE };
 	}
 	if (is_operator_token(right)) {
 		if (token_is(right, "*") && left && token_is(left, "*")) {
-			return (WsDecision){ .kind = WS_NONE };
+			return (struct whitespace_decision){ .kind = WS_NONE };
 		}
 		if ((token_is(right, "*") || token_is(right, "&"))
 				&& left
 				&& (left->kind == TOK_KEYWORD || left->kind == TOK_IDENTIFIER)) {
 			if (gap_has_newline(ts, gap_start, gap_end)) {
-				return (WsDecision){ .kind = WS_PRESERVE };
+				return (struct whitespace_decision){ .kind = WS_PRESERVE };
 			}
-			return (WsDecision){ .kind = WS_SPACE };
+			return (struct whitespace_decision){ .kind = WS_SPACE };
 		}
 
 		/*
@@ -445,16 +445,16 @@ rules_gap_decision(const TokenStream *ts, size_t index,
 		if (left && lex_first(ts, left) == ')'
 				&& (!strcmp(ctx->parent_type, "pointer_expression")
 					|| !strcmp(ctx->parent_type, "unary_expression"))) {
-			const Token *operand = (index + 1 < ts->count) ? &ts->tokens[index + 1] : NULL;
+			const struct token *operand = (index + 1 < ts->count) ? &ts->tokens[index + 1] : NULL;
 			if (operand && operand->kind == TOK_NUMBER) {
-				return (WsDecision){ .kind = WS_PRESERVE };
+				return (struct whitespace_decision){ .kind = WS_PRESERVE };
 			}
-			return (WsDecision){ .kind = WS_NONE };
+			return (struct whitespace_decision){ .kind = WS_NONE };
 		}
 		if (gap_has_newline(ts, gap_start, gap_end)) {
-			return (WsDecision){ .kind = WS_PRESERVE };
+			return (struct whitespace_decision){ .kind = WS_PRESERVE };
 		}
-		return (WsDecision){ .kind = WS_SPACE };
+		return (struct whitespace_decision){ .kind = WS_SPACE };
 	}
 
 	/*
@@ -466,13 +466,13 @@ rules_gap_decision(const TokenStream *ts, size_t index,
 		if ((token_is(left, "}") || token_is(left, ";"))
 				&& right->kind != TOK_PUNCT
 				&& gap_has_newline(ts, gap_start, gap_end)) {
-			return (WsDecision){ .kind = WS_NEWLINE };
+			return (struct whitespace_decision){ .kind = WS_NEWLINE };
 		}
 		if (left->kind == TOK_PREPROC || token_is(left, "#include")) {
 			if (right->kind != TOK_PREPROC && lex_first(ts, right) != '#') {
-				return (WsDecision){ .kind = WS_BLANK_LINE };
+				return (struct whitespace_decision){ .kind = WS_BLANK_LINE };
 			}
-			return (WsDecision){ .kind = WS_NEWLINE };
+			return (struct whitespace_decision){ .kind = WS_NEWLINE };
 		}
 	}
 
@@ -480,13 +480,13 @@ rules_gap_decision(const TokenStream *ts, size_t index,
 	if (ctx->indent_depth == 0 && left && token_is(left, "}")
 			&& (right->kind == TOK_KEYWORD || right->kind == TOK_IDENTIFIER)
 			&& gap_has_newline(ts, gap_start, gap_end)) {
-		return (WsDecision){ .kind = WS_BLANK_LINE };
+		return (struct whitespace_decision){ .kind = WS_BLANK_LINE };
 	}
 
 	/* Leading file newline. */
 	if (!left && gap_start < gap_end && ts->source[gap_start] == '\n') {
-		return (WsDecision){ .kind = WS_NEWLINE };
+		return (struct whitespace_decision){ .kind = WS_NEWLINE };
 	}
 
-	return (WsDecision){ .kind = WS_PRESERVE };
+	return (struct whitespace_decision){ .kind = WS_PRESERVE };
 }

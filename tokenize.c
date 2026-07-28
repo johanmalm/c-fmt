@@ -33,7 +33,7 @@ type_is_keyword(const char *type)
 		|| !strcmp(type, "_Imaginary");
 }
 
-static TokenKind
+static enum token_kind
 classify_token(const char *type)
 {
 	if (strncmp(type, "preproc_", 8) == 0 || type[0] == '#') {
@@ -79,11 +79,11 @@ classify_token(const char *type)
 }
 
 static int
-token_stream_push(TokenStream *ts, TSNode node)
+token_stream_push(struct token_stream *ts, TSNode node)
 {
 	if (ts->count >= ts->capacity) {
 		size_t cap = ts->capacity ? ts->capacity * 2 : 256;
-		Token *grown = realloc(ts->tokens, cap * sizeof(Token));
+		struct token *grown = realloc(ts->tokens, cap * sizeof(*grown));
 		if (!grown) {
 			return -1;
 		}
@@ -92,7 +92,7 @@ token_stream_push(TokenStream *ts, TSNode node)
 	}
 
 	const char *type = ts_node_type(node);
-	Token *tok = &ts->tokens[ts->count++];
+	struct token *tok = &ts->tokens[ts->count++];
 	tok->start = ts_node_start_byte(node);
 	tok->end = ts_node_end_byte(node);
 	tok->type = type;
@@ -101,7 +101,7 @@ token_stream_push(TokenStream *ts, TSNode node)
 }
 
 static int
-collect_tokens(TokenStream *ts, TSNode node)
+collect_tokens(struct token_stream *ts, TSNode node)
 {
 	if (is_syntax_leaf(node)) {
 		return token_stream_push(ts, node);
@@ -121,7 +121,7 @@ collect_tokens(TokenStream *ts, TSNode node)
 }
 
 void
-token_stream_build(TokenStream *ts, TSNode root, const char *source,
+token_stream_build(struct token_stream *ts, TSNode root, const char *source,
 		uint32_t source_len)
 {
 	ts->tokens = NULL;
@@ -136,7 +136,7 @@ token_stream_build(TokenStream *ts, TSNode root, const char *source,
 }
 
 void
-token_stream_free(TokenStream *ts)
+token_stream_free(struct token_stream *ts)
 {
 	free(ts->tokens);
 	free(ts->contexts);

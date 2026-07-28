@@ -3,8 +3,8 @@
 #include <stdio.h>
 #include <string.h>
 
-static const FormatCtx *
-ctx_before_token(const TokenStream *ts, size_t index)
+static const struct format_ctx *
+ctx_before_token(const struct token_stream *ts, size_t index)
 {
 	if (!ts->contexts || ts->count == 0) {
 		return NULL;
@@ -16,7 +16,7 @@ ctx_before_token(const TokenStream *ts, size_t index)
 }
 
 static void
-emit_preserve_gap(const TokenStream *ts, uint32_t start, uint32_t end, FILE *out)
+emit_preserve_gap(const struct token_stream *ts, uint32_t start, uint32_t end, FILE *out)
 {
 	const char *s = ts->source + start;
 	uint32_t len = end - start;
@@ -66,8 +66,8 @@ print_indent(FILE *out, int indent)
 }
 
 static void
-emit_gap(const TokenStream *ts, uint32_t start, uint32_t end, WsDecision ws,
-		const FormatCtx *ctx, FILE *out)
+emit_gap(const struct token_stream *ts, uint32_t start, uint32_t end, struct whitespace_decision ws,
+		const struct format_ctx *ctx, FILE *out)
 {
 	if (start >= end && ws.kind == WS_NONE) {
 		return;
@@ -99,32 +99,32 @@ emit_gap(const TokenStream *ts, uint32_t start, uint32_t end, WsDecision ws,
 }
 
 static void
-emit_token(const TokenStream *ts, const Token *tok, FILE *out)
+emit_token(const struct token_stream *ts, const struct token *tok, FILE *out)
 {
 	fwrite(ts->source + tok->start, 1, tok->end - tok->start, out);
 }
 
 void
-format_render(const TokenStream *ts, FILE *out)
+format_render(const struct token_stream *ts, FILE *out)
 {
 	uint32_t pos = 0;
 
 	for (size_t i = 0; i < ts->count; i++) {
-		const Token *tok = &ts->tokens[i];
-		const FormatCtx *ctx = ctx_before_token(ts, i);
-		WsDecision ws = rules_gap_decision(ts, i, pos, tok->start, ctx);
+		const struct token *tok = &ts->tokens[i];
+		const struct format_ctx *ctx = ctx_before_token(ts, i);
+		struct whitespace_decision ws = rules_gap_decision(ts, i, pos, tok->start, ctx);
 
 		emit_gap(ts, pos, tok->start, ws, ctx, out);
 		emit_token(ts, tok, out);
 		pos = tok->end;
 	}
 
-	const FormatCtx *tail_ctx = ctx_before_token(ts, ts->count);
-	WsDecision tail = rules_gap_decision(ts, ts->count, pos, ts->root_end, tail_ctx);
+	const struct format_ctx *tail_ctx = ctx_before_token(ts, ts->count);
+	struct whitespace_decision tail = rules_gap_decision(ts, ts->count, pos, ts->root_end, tail_ctx);
 	emit_gap(ts, pos, ts->root_end, tail, tail_ctx, out);
 
 	if (ts->root_end < ts->source_len) {
-		WsDecision extra = rules_gap_decision(ts, ts->count, ts->root_end,
+		struct whitespace_decision extra = rules_gap_decision(ts, ts->count, ts->root_end,
 				ts->source_len, tail_ctx);
 		emit_gap(ts, ts->root_end, ts->source_len, extra, tail_ctx, out);
 	}

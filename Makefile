@@ -9,7 +9,6 @@ PROG = c-fmt
 
 OBJ = \
       main.o \
-      formatter.o \
       tokenize.o \
       context.o \
       rules.o \
