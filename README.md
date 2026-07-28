@@ -1,12 +1,9 @@
 # Depends
 
-- [tree-sitter]
-
-[tree-sitter]: https://archlinux.org/packages/extra/x86_64/tree-sitter/
+- [tree-sitter](https://archlinux.org/packages/extra/x86_64/tree-sitter/)
 
 # Build
 
-    git clone https://github.com/tree-sitter/tree-sitter-c
     make
 
 # Tests
