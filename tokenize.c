@@ -125,7 +125,6 @@ token_stream_build(struct token_stream *ts, TSNode root, const char *source,
 		uint32_t source_len)
 {
 	ts->tokens = NULL;
-	ts->contexts = NULL;
 	ts->count = 0;
 	ts->capacity = 0;
 	ts->source = source;
@@ -139,9 +138,7 @@ void
 token_stream_free(struct token_stream *ts)
 {
 	free(ts->tokens);
-	free(ts->contexts);
 	ts->tokens = NULL;
-	ts->contexts = NULL;
 	ts->count = 0;
 	ts->capacity = 0;
 }

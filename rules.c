@@ -63,8 +63,8 @@ is_unary_context(const struct token_stream *ts, size_t left_index, const struct 
 	 * not (!x), and pointer declarators (**pp) where token-level heuristics
 	 * would incorrectly classify them as binary operators.
 	 */
-	if (ts->contexts && left_index < ts->count) {
-		const char *pt = ts->contexts[left_index].parent_type;
+	if (left_index < ts->count) {
+		const char *pt = ts->tokens[left_index].format_ctx.parent_type;
 		if (!strcmp(pt, "pointer_declarator")
 				|| !strcmp(pt, "abstract_pointer_declarator")
 				|| !strcmp(pt, "pointer_expression")
@@ -218,7 +218,7 @@ rules_gap_decision(const struct token_stream *ts, size_t index,
 	 * this rule when '*' is a binary operator (e.g. 'a * b').
 	 */
 	if (left && token_is(left, "*") && right->kind == TOK_IDENTIFIER) {
-		const struct format_ctx *left_ctx = &ts->contexts[index - 1];
+		const struct format_ctx *left_ctx = &ts->tokens[index - 1].format_ctx;
 		if (strcmp(left_ctx->parent_type, "binary_expression") != 0
 				&& strcmp(left_ctx->parent_type, "pointer_expression") != 0) {
 			/*
@@ -257,11 +257,11 @@ rules_gap_decision(const struct token_stream *ts, size_t index,
 			 * needs normal spacing (e.g. '*dst++ = x').
 			 */
 			if ((token_is(left, "++") || token_is(left, "--"))
-					&& ts->contexts && index < ts->count
-					&& !strcmp(ts->contexts[index - 1].parent_type,
+					&& index < ts->count
+					&& !strcmp(ts->tokens[index - 1].format_ctx.parent_type,
 						"update_expression")
-					&& strcmp(ts->contexts[index - 1].parent_type,
-						ts->contexts[index].parent_type)) {
+					&& strcmp(ts->tokens[index - 1].format_ctx.parent_type,
+						ts->tokens[index].format_ctx.parent_type)) {
 				/*
 				 * Fall through to binary operator spacing below
 				 */
@@ -310,7 +310,7 @@ rules_gap_decision(const struct token_stream *ts, size_t index,
 			 */
 			return (struct whitespace_decision){ .kind = WS_PRESERVE };
 		}
-		const struct format_ctx *left_ctx = &ts->contexts[index - 1];
+		const struct format_ctx *left_ctx = &ts->tokens[index - 1].format_ctx;
 		if (left_ctx->in_condition || left_ctx->in_for_header) {
 			return (struct whitespace_decision){ .kind = WS_SPACE };
 		}
@@ -334,7 +334,7 @@ rules_gap_decision(const struct token_stream *ts, size_t index,
 
 	/* First token inside a compound statement. */
 	if (left && token_is(left, "{") && ctx->in_compound_statement) {
-		const struct format_ctx *left_ctx = &ts->contexts[index - 1];
+		const struct format_ctx *left_ctx = &ts->tokens[index - 1].format_ctx;
 		if (!strcmp(left_ctx->parent_type, "compound_statement")) {
 			if (right && (token_is(right, "case") || token_is(right, "default"))) {
 				return with_indent(ctx, -1);
@@ -353,7 +353,7 @@ rules_gap_decision(const struct token_stream *ts, size_t index,
 
 	/* Statement boundaries. */
 	if (left && token_is(left, ";") && ctx->in_compound_statement) {
-		const struct format_ctx *left_ctx = &ts->contexts[index - 1];
+		const struct format_ctx *left_ctx = &ts->tokens[index - 1].format_ctx;
 		if (left_ctx->in_for_header) {
 			if (gap_has_newline(ts, gap_start, gap_end)) {
 				return (struct whitespace_decision){ .kind = WS_PRESERVE };

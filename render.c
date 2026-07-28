@@ -6,13 +6,13 @@
 static const struct format_ctx *
 ctx_before_token(const struct token_stream *ts, size_t index)
 {
-	if (!ts->contexts || ts->count == 0) {
+	if (!ts->tokens || ts->count == 0) {
 		return NULL;
 	}
 	if (index < ts->count) {
-		return &ts->contexts[index];
+		return &ts->tokens[index].format_ctx;
 	}
-	return &ts->contexts[ts->count - 1];
+	return &ts->tokens[ts->count - 1].format_ctx;
 }
 
 static void

@@ -110,11 +110,6 @@ context_at(TSNode node)
 void
 context_build(struct token_stream *ts)
 {
-	ts->contexts = calloc(ts->count, sizeof(struct format_ctx));
-	if (!ts->contexts) {
-		return;
-	}
-
 	for (size_t i = 0; i < ts->count; i++) {
 		uint32_t start = ts->tokens[i].start;
 		uint32_t end = ts->tokens[i].end;
@@ -123,6 +118,6 @@ context_build(struct token_stream *ts)
 		}
 
 		TSNode node = ts_node_descendant_for_byte_range(ts->root, start, end);
-		ts->contexts[i] = context_at(node);
+		ts->tokens[i].format_ctx = context_at(node);
 	}
 }

@@ -18,13 +18,6 @@ enum token_kind {
 	TOK_OTHER,
 };
 
-struct token {
-	uint32_t start;
-	uint32_t end;
-	enum token_kind kind;
-	const char *type;
-};
-
 struct format_ctx {
 	int indent_depth;
 	bool in_argument_list;
@@ -40,9 +33,16 @@ struct format_ctx {
 	const char *parent_type;
 };
 
+struct token {
+	uint32_t start;
+	uint32_t end;
+	enum token_kind kind;
+	const char *type;
+	struct format_ctx format_ctx;
+};
+
 struct token_stream {
 	struct token *tokens;
-	struct format_ctx *contexts;
 	size_t count;
 	size_t capacity;
 	const char *source;
