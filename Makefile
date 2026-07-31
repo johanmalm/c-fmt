@@ -1,5 +1,7 @@
 CFLAGS += -g -Wall
 LDFLAGS += `pkg-config --libs tree-sitter`
+ASAN_FLAGS = -O0 -fsanitize=address -fno-common -fno-omit-frame-pointer -rdynamic
+CFLAGS += $(ASAN_FLAGS)
 PREFIX  ?= $(HOME)
 bindir  ?= $(PREFIX)/bin
 CC = gcc
