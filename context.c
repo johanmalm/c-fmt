@@ -1,8 +1,9 @@
-#include "formatter.h"
-
+// SPDX-License-Identifier: GPL-2.0-only
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "formatter.h"
 
 static bool
 is_preproc_ancestor(const char *type)
@@ -71,8 +72,11 @@ context_at(TSNode node)
 
 		if (!strcmp(type, "compound_statement")) {
 			if (is_case_body_compound(anc)) {
-				/* case FOO: { ... } scopes variables but does not add
-				 * an extra indent level in the author's style. */
+				/*
+				 * case FOO: { ... } scopes variables but does
+				 * not add an extra indent level in the author's
+				 * style.
+				 */
 				ctx.in_compound_statement = true;
 				continue;
 			}

@@ -1,7 +1,8 @@
-#include "formatter.h"
-
+// SPDX-License-Identifier: GPL-2.0-only
 #include <stdio.h>
 #include <string.h>
+
+#include "formatter.h"
 
 static const struct format_ctx *
 ctx_before_token(const struct token_stream *ts, size_t index)
@@ -112,7 +113,8 @@ format_render(const struct token_stream *ts, FILE *out)
 	for (size_t i = 0; i < ts->count; i++) {
 		const struct token *tok = &ts->tokens[i];
 		const struct format_ctx *ctx = ctx_before_token(ts, i);
-		struct whitespace_decision ws = rules_gap_decision(ts, i, pos, tok->start, ctx);
+		struct whitespace_decision ws = rules_gap_decision(ts, i, pos,
+			tok->start, ctx);
 
 		emit_gap(ts, pos, tok->start, ws, ctx, out);
 		emit_token(ts, tok, out);
@@ -120,12 +122,13 @@ format_render(const struct token_stream *ts, FILE *out)
 	}
 
 	const struct format_ctx *tail_ctx = ctx_before_token(ts, ts->count);
-	struct whitespace_decision tail = rules_gap_decision(ts, ts->count, pos, ts->root_end, tail_ctx);
+	struct whitespace_decision tail = rules_gap_decision(ts, ts->count, pos,
+		ts->root_end, tail_ctx);
 	emit_gap(ts, pos, ts->root_end, tail, tail_ctx, out);
 
 	if (ts->root_end < ts->source_len) {
-		struct whitespace_decision extra = rules_gap_decision(ts, ts->count, ts->root_end,
-				ts->source_len, tail_ctx);
+		struct whitespace_decision extra = rules_gap_decision(ts,
+			ts->count, ts->root_end, ts->source_len, tail_ctx);
 		emit_gap(ts, ts->root_end, ts->source_len, extra, tail_ctx, out);
 	}
 }

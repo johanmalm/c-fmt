@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 #ifndef FORMATTER_H
 #define FORMATTER_H
 

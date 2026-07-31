@@ -1,7 +1,8 @@
-#include "formatter.h"
-
+// SPDX-License-Identifier: GPL-2.0-only
 #include <stdlib.h>
 #include <string.h>
+
+#include "formatter.h"
 
 static bool
 is_syntax_leaf(TSNode node)

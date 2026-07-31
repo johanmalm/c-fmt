@@ -1,6 +1,7 @@
-#include "formatter.h"
-
+// SPDX-License-Identifier: GPL-2.0-only
 #include <string.h>
+
+#include "formatter.h"
 
 static bool
 token_is(const struct token *tok, const char *s)
@@ -78,7 +79,8 @@ is_unary_context(const struct token_stream *ts, size_t left_index, const struct 
 	}
 	const struct token *prev = &ts->tokens[left_index - 1];
 	char c = lex_first(ts, prev);
-	if (c == '(' || c == ',' || c == '[' || c == '=' || c == '{' || c == ';' || c == ':' || c == '?') {
+	if (c == '(' || c == ',' || c == '[' || c == '=' || c == '{' || c == ';'
+			|| c == ':' || c == '?') {
 		return true;
 	}
 	if (prev->kind == TOK_KEYWORD) {
@@ -380,7 +382,9 @@ rules_gap_decision(const struct token_stream *ts, size_t index,
 		 */
 		if (!strcmp(ctx->parent_type, "labeled_statement")) {
 			if (gap_has_blank_line(ts, gap_start, gap_end)) {
-				return (struct whitespace_decision){ .kind = WS_BLANK_LINE, .indent = 0 };
+				return (struct whitespace_decision){
+					.kind = WS_BLANK_LINE, .indent = 0,
+				};
 			}
 			return newline_indent(0);
 		}
@@ -399,7 +403,10 @@ rules_gap_decision(const struct token_stream *ts, size_t index,
 			return with_indent(ctx, -1);
 		}
 		if (gap_has_blank_line(ts, gap_start, gap_end)) {
-			return (struct whitespace_decision){ .kind = WS_BLANK_LINE, .indent = ctx->indent_depth };
+			return (struct whitespace_decision){
+				.kind = WS_BLANK_LINE,
+				.indent = ctx->indent_depth,
+			};
 		}
 		return newline_indent(ctx->indent_depth);
 	}
@@ -407,8 +414,9 @@ rules_gap_decision(const struct token_stream *ts, size_t index,
 	/* Postfix ++/-- has no space before it. */
 	if (right && (token_is(right, "++") || token_is(right, "--")) && left
 			&& (left->kind == TOK_IDENTIFIER
-				|| (left->kind == TOK_PUNCT
-					&& (lex_first(ts, left) == ')' || lex_first(ts, left) == ']')))) {
+			|| (left->kind == TOK_PUNCT
+			&& (lex_first(ts, left) == ')'
+			|| lex_first(ts, left) == ']')))) {
 		return (struct whitespace_decision){ .kind = WS_NONE };
 	}
 
@@ -445,7 +453,8 @@ rules_gap_decision(const struct token_stream *ts, size_t index,
 		if (left && lex_first(ts, left) == ')'
 				&& (!strcmp(ctx->parent_type, "pointer_expression")
 					|| !strcmp(ctx->parent_type, "unary_expression"))) {
-			const struct token *operand = (index + 1 < ts->count) ? &ts->tokens[index + 1] : NULL;
+			const struct token *operand = (index + 1 < ts->count)
+				? &ts->tokens[index + 1] : NULL;
 			if (operand && operand->kind == TOK_NUMBER) {
 				return (struct whitespace_decision){ .kind = WS_PRESERVE };
 			}
