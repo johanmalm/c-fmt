@@ -8,10 +8,8 @@ test_description='validate format of labwc'
 for f in $(find ../labwc/src/ -name "*.c"); do
 	[ -f "$f" ] || continue
 
-	[ $f = "../labwc/src/interactive.c" ] && continue
 	[ $f = "../labwc/src/cycle/cycle.c" ] && continue
 	[ $f = "../labwc/src/cycle/osd-field.c" ] && continue
-	[ $f = "../labwc/src/img/img.c" ] && continue
 	[ $f = "../labwc/src/img/img-xpm.c" ] && continue
 	[ $f = "../labwc/src/config/keybind.c" ] && continue
 	[ $f = "../labwc/src/config/session.c" ] && continue
