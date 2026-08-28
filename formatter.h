@@ -35,12 +35,23 @@ struct format_ctx {
 };
 
 struct token {
-	uint32_t start;
-	uint32_t end;
+	TSNode node;
 	enum token_kind kind;
 	const char *type;
 	struct format_ctx format_ctx;
 };
+
+static inline uint32_t
+token_start(const struct token *tok)
+{
+	return ts_node_start_byte(tok->node);
+}
+
+static inline uint32_t
+token_end(const struct token *tok)
+{
+	return ts_node_end_byte(tok->node);
+}
 
 struct token_stream {
 	struct token *tokens;

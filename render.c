@@ -102,7 +102,7 @@ emit_gap(const struct token_stream *ts, uint32_t start, uint32_t end, struct whi
 static void
 emit_token(const struct token_stream *ts, const struct token *tok, FILE *out)
 {
-	fwrite(ts->source + tok->start, 1, tok->end - tok->start, out);
+	fwrite(ts->source + token_start(tok), 1, token_end(tok) - token_start(tok), out);
 }
 
 void
@@ -114,11 +114,11 @@ format_render(const struct token_stream *ts, FILE *out)
 		const struct token *tok = &ts->tokens[i];
 		const struct format_ctx *ctx = ctx_before_token(ts, i);
 		struct whitespace_decision ws = rules_gap_decision(ts, i, pos,
-			tok->start, ctx);
+			token_start(tok), ctx);
 
-		emit_gap(ts, pos, tok->start, ws, ctx, out);
+		emit_gap(ts, pos, token_start(tok), ws, ctx, out);
 		emit_token(ts, tok, out);
-		pos = tok->end;
+		pos = token_end(tok);
 	}
 
 	const struct format_ctx *tail_ctx = ctx_before_token(ts, ts->count);

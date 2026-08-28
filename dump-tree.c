@@ -16,17 +16,12 @@ dump(const char *label, const char *src)
 	printf("%s:\n", label);
 	for (size_t i = 0; i < ts.count; i++) {
 		char buf[32] = {0};
-		memcpy(buf, src + ts.tokens[i].start,
-			ts.tokens[i].end - ts.tokens[i].start < 31 ?
-			ts.tokens[i].end - ts.tokens[i].start : 31);
+		uint32_t start = token_start(&ts.tokens[i]);
+		uint32_t end = token_end(&ts.tokens[i]);
+		memcpy(buf, src + start, end - start < 31 ? end - start : 31);
 
 		if (strcmp(buf, "-") == 0 || strcmp(buf, ")") == 0) {
-			uint32_t start = ts.tokens[i].start;
-			uint32_t end = ts.tokens[i].end;
-			if (end <= start) {
-				end = start + 1;
-			}
-			TSNode node = ts_node_descendant_for_byte_range(root, start, end);
+			TSNode node = ts.tokens[i].node;
 
 			for (TSNode n = node; !ts_node_is_null(n); n = ts_node_parent(n)) {
 				const char *t = ts_node_type(n);

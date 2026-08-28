@@ -12,7 +12,7 @@ token_is(const struct token *tok, const char *s)
 static char
 lex_first(const struct token_stream *ts, const struct token *tok)
 {
-	return ts->source[tok->start];
+	return ts->source[token_start(tok)];
 }
 
 static bool
@@ -47,10 +47,10 @@ is_operator_token(const struct token *tok)
 static bool
 token_text_eq(const struct token_stream *ts, const struct token *tok, const char *s)
 {
-	size_t tok_len = tok->end - tok->start;
+	size_t tok_len = token_end(tok) - token_start(tok);
 	size_t s_len = strlen(s);
 
-	return tok_len == s_len && !strncmp(ts->source + tok->start, s, tok_len);
+	return tok_len == s_len && !strncmp(ts->source + token_start(tok), s, tok_len);
 }
 
 static bool
