@@ -70,7 +70,8 @@ is_unary_context(const struct token_stream *ts, size_t left_index, const struct 
 				|| !strcmp(pt, "abstract_pointer_declarator")
 				|| !strcmp(pt, "pointer_expression")
 				|| !strcmp(pt, "unary_expression")
-				|| !strcmp(pt, "update_expression")) {
+				|| !strcmp(pt, "update_expression")
+				|| !strcmp(pt, "cast_expression")) {
 			return true;
 		}
 	}
@@ -452,7 +453,8 @@ rules_gap_decision(const struct token_stream *ts, size_t index,
 		 */
 		if (left && lex_first(ts, left) == ')'
 				&& (!strcmp(ctx->parent_type, "pointer_expression")
-					|| !strcmp(ctx->parent_type, "unary_expression"))) {
+					|| !strcmp(ctx->parent_type, "unary_expression")
+					|| !strcmp(ctx->parent_type, "cast_expression"))) {
 			const struct token *operand = (index + 1 < ts->count)
 				? &ts->tokens[index + 1] : NULL;
 			if (operand && operand->kind == TOK_NUMBER) {
