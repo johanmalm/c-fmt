@@ -54,25 +54,15 @@ token_text_eq(const struct token_stream *ts, const struct token *tok, const char
 }
 
 static bool
-token_text_same(const struct token_stream *ts, const struct token *a, const struct token *b)
+is_known_cast_typedef_name(const struct token_stream *ts, const struct token *ident)
 {
-	size_t a_len = a->end - a->start;
-	size_t b_len = b->end - b->start;
+	static const char *known[] = {
+		"gunichar",
+		NULL,
+	};
 
-	return a_len == b_len
-		&& !strncmp(ts->source + a->start, ts->source + b->start, a_len);
-}
-
-static bool
-typedef_decl_contains_identifier(const struct token_stream *ts, size_t typedef_idx,
-		const struct token *ident)
-{
-	for (size_t i = typedef_idx + 1; i < ts->count; i++) {
-		const struct token *tok = &ts->tokens[i];
-		if (tok->kind == TOK_PUNCT && lex_first(ts, tok) == ';') {
-			return false;
-		}
-		if (tok->kind == TOK_IDENTIFIER && token_text_same(ts, tok, ident)) {
+	for (size_t i = 0; known[i]; i++) {
+		if (token_text_eq(ts, ident, known[i])) {
 			return true;
 		}
 	}
@@ -80,21 +70,7 @@ typedef_decl_contains_identifier(const struct token_stream *ts, size_t typedef_i
 }
 
 static bool
-has_prior_typedef_name(const struct token_stream *ts, size_t before_idx,
-		const struct token *ident)
-{
-	for (size_t i = 0; i < before_idx && i < ts->count; i++) {
-		const struct token *tok = &ts->tokens[i];
-		if (tok->kind == TOK_KEYWORD && token_text_eq(ts, tok, "typedef")
-				&& typedef_decl_contains_identifier(ts, i, ident)) {
-			return true;
-		}
-	}
-	return false;
-}
-
-static bool
-is_probable_typedef_cast_unary_minus(const struct token_stream *ts, size_t op_idx)
+is_known_typedef_cast_unary_minus(const struct token_stream *ts, size_t op_idx)
 {
 	if (op_idx == 0 || op_idx + 1 >= ts->count) {
 		return false;
@@ -150,7 +126,7 @@ is_probable_typedef_cast_unary_minus(const struct token_stream *ts, size_t op_id
 		return false;
 	}
 
-	return ident && has_prior_typedef_name(ts, op_idx, ident);
+	return ident && is_known_cast_typedef_name(ts, ident);
 }
 
 static bool
@@ -558,14 +534,16 @@ rules_gap_decision(const struct token_stream *ts, size_t index,
 		 * space.  E.g. '(int *)&val', '(void *)!cond'.  Exception: if
 		 * the operand is a number literal, the parser has misclassified
 		 * a binary multiply (e.g. 'sizeof(float) * 4') as a pointer
-		 * dereference; preserve the original spacing.
+		 * dereference; preserve the original spacing.  Also handle
+		 * selected typedef-name casts that tree-sitter parses as
+		 * binary_expression.
 		 */
 		if (left && lex_first(ts, left) == ')'
 				&& (!strcmp(ctx->parent_type, "pointer_expression")
 					|| !strcmp(ctx->parent_type, "unary_expression")
 					|| !strcmp(ctx->parent_type, "cast_expression")
 					|| (!strcmp(ctx->parent_type, "binary_expression")
-						&& is_probable_typedef_cast_unary_minus(ts, index)))) {
+						&& is_known_typedef_cast_unary_minus(ts, index)))) {
 			const struct token *operand = (index + 1 < ts->count)
 				? &ts->tokens[index + 1] : NULL;
 			if (operand && operand->kind == TOK_NUMBER) {

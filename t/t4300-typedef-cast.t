@@ -41,4 +41,24 @@ test_expect_success "parenthesized variable stays binary subtraction" '
 	test_cmp expect actual
 '
 
+test_expect_success "non-allowlisted typedef stays spaced" '
+	cat >input.c <<-\EOF &&
+	typedef int foo_t;
+	int f(void)
+	{
+		return (foo_t)-1;
+	}
+	EOF
+	cat >expect <<-\EOF &&
+	typedef int foo_t;
+
+	int f(void)
+	{
+		return (foo_t) - 1;
+	}
+	EOF
+	../../c-fmt input.c >actual &&
+	test_cmp expect actual
+'
+
 test_done
