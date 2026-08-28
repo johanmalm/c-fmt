@@ -1,4 +1,5 @@
 c-fmt
+dump-tree
 *.o
 _codeql_detected_source_root
 .cache/

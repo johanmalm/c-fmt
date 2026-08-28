@@ -7,10 +7,9 @@ bindir  ?= $(PREFIX)/bin
 CC = gcc
 RM = rm -f
 
-PROG = c-fmt
+PROG = c-fmt dump-tree
 
 OBJ = \
-      main.o \
       tokenize.o \
       context.o \
       rules.o \
@@ -19,7 +18,10 @@ OBJ = \
 
 all: $(PROG)
 
-$(PROG): $(OBJ)
+c-fmt: main.c $(OBJ)
+	@echo '     LINK  '$@;$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+dump-tree: dump-tree.c $(OBJ)
 	@echo '     LINK  '$@;$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 %.o : %.c
