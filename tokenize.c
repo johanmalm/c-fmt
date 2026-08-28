@@ -94,8 +94,7 @@ token_stream_push(struct token_stream *ts, TSNode node)
 
 	const char *type = ts_node_type(node);
 	struct token *tok = &ts->tokens[ts->count++];
-	tok->start = ts_node_start_byte(node);
-	tok->end = ts_node_end_byte(node);
+	tok->node = node;
 	tok->type = type;
 	tok->kind = classify_token(type);
 	return 0;
