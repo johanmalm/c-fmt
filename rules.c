@@ -45,6 +45,115 @@ is_operator_token(const struct token *tok)
 }
 
 static bool
+token_text_eq(const struct token_stream *ts, const struct token *tok, const char *s)
+{
+	size_t tok_len = tok->end - tok->start;
+	size_t s_len = strlen(s);
+
+	return tok_len == s_len && !strncmp(ts->source + tok->start, s, tok_len);
+}
+
+static bool
+token_text_same(const struct token_stream *ts, const struct token *a, const struct token *b)
+{
+	size_t a_len = a->end - a->start;
+	size_t b_len = b->end - b->start;
+
+	return a_len == b_len
+		&& !strncmp(ts->source + a->start, ts->source + b->start, a_len);
+}
+
+static bool
+typedef_decl_contains_identifier(const struct token_stream *ts, size_t typedef_idx,
+		const struct token *ident)
+{
+	for (size_t i = typedef_idx + 1; i < ts->count; i++) {
+		const struct token *tok = &ts->tokens[i];
+		if (tok->kind == TOK_PUNCT && lex_first(ts, tok) == ';') {
+			return false;
+		}
+		if (tok->kind == TOK_IDENTIFIER && token_text_same(ts, tok, ident)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+static bool
+has_prior_typedef_name(const struct token_stream *ts, size_t before_idx,
+		const struct token *ident)
+{
+	for (size_t i = 0; i < before_idx && i < ts->count; i++) {
+		const struct token *tok = &ts->tokens[i];
+		if (tok->kind == TOK_KEYWORD && token_text_eq(ts, tok, "typedef")
+				&& typedef_decl_contains_identifier(ts, i, ident)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+static bool
+is_probable_typedef_cast_unary_minus(const struct token_stream *ts, size_t op_idx)
+{
+	if (op_idx == 0 || op_idx + 1 >= ts->count) {
+		return false;
+	}
+
+	const struct token *op = &ts->tokens[op_idx];
+	const struct token *close = &ts->tokens[op_idx - 1];
+	if (!token_is(op, "-") || close->kind != TOK_PUNCT || lex_first(ts, close) != ')') {
+		return false;
+	}
+
+	size_t close_idx = op_idx - 1;
+	size_t open_idx = ts->count;
+	int depth = 0;
+	for (size_t i = close_idx + 1; i > 0; i--) {
+		size_t idx = i - 1;
+		const struct token *tok = &ts->tokens[idx];
+		if (tok->kind != TOK_PUNCT) {
+			continue;
+		}
+		char c = lex_first(ts, tok);
+		if (c == ')') {
+			depth++;
+		} else if (c == '(') {
+			depth--;
+			if (depth == 0) {
+				open_idx = idx;
+				break;
+			}
+		}
+	}
+
+	if (open_idx == ts->count || open_idx + 1 >= close_idx) {
+		return false;
+	}
+
+	const struct token *ident = NULL;
+	for (size_t i = open_idx + 1; i < close_idx; i++) {
+		const struct token *tok = &ts->tokens[i];
+		if (tok->kind == TOK_IDENTIFIER) {
+			if (ident) {
+				return false;
+			}
+			ident = tok;
+			continue;
+		}
+		if (tok->kind == TOK_KEYWORD) {
+			continue;
+		}
+		if (tok->kind == TOK_OPERATOR && token_is(tok, "*")) {
+			continue;
+		}
+		return false;
+	}
+
+	return ident && has_prior_typedef_name(ts, op_idx, ident);
+}
+
+static bool
 is_unary_context(const struct token_stream *ts, size_t left_index, const struct token *left)
 {
 	if (!is_operator_token(left)) {
@@ -454,7 +563,9 @@ rules_gap_decision(const struct token_stream *ts, size_t index,
 		if (left && lex_first(ts, left) == ')'
 				&& (!strcmp(ctx->parent_type, "pointer_expression")
 					|| !strcmp(ctx->parent_type, "unary_expression")
-					|| !strcmp(ctx->parent_type, "cast_expression"))) {
+					|| !strcmp(ctx->parent_type, "cast_expression")
+					|| (!strcmp(ctx->parent_type, "binary_expression")
+						&& is_probable_typedef_cast_unary_minus(ts, index)))) {
 			const struct token *operand = (index + 1 < ts->count)
 				? &ts->tokens[index + 1] : NULL;
 			if (operand && operand->kind == TOK_NUMBER) {
